@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer Masterpiece | Interactive Deep Dive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #020205;
+            --surface: #0a0a0f;
+            --glass: rgba(15, 15, 25, 0.8);
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #a855f7;
+            --accent-glow: rgba(168, 85, 247, 0.4);
+            --secondary: #3b82f6;
+            --tertiary: #10b981;
+            --pink: #ec4899;
+            --gold: #f59e0b;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        h1, h2, h3, h4 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+
+        /* Scrollytelling Framework */
+        .scrolly-container { display: flex; position: relative; }
+
+        .side-diagram {
+            position: sticky;
+            top: 0;
+            width: 40%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            z-index: 10;
+        }
+
+        .main-content {
+            width: 60%;
+            padding-bottom: 50vh;
+        }
+
+        section {
+            min-height: 100vh;
+            padding: 12vh 4rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* SVG Logic */
+        svg#master-diagram { width: 100%; height: auto; max-height: 90vh; filter: drop-shadow(0 0 30px rgba(0,0,0,0.8)); }
+        .block { cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); stroke-width: 0.8; }
+        .block:hover { filter: brightness(1.4); transform: scale(1.02); }
+        .active-block { stroke: var(--accent) !important; stroke-width: 3 !important; filter: drop-shadow(0 0 15px var(--accent)); }
+        .dimmed { opacity: 0.1; filter: grayscale(1); }
+        .diag-text { pointer-events: none; font-family: 'Space Grotesk'; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Interactive Components */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            margin-top: 2rem;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.7);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tech-badge {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            background: var(--accent-glow);
+            border: 1px solid var(--accent);
+            color: #fff;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1.5rem;
+        }
+
+        .formula {
+            font-family: var(--font-mono);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 1.5rem;
+            border-radius: 12px;
+            color: var(--secondary);
+            margin: 2rem 0;
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+
+        .formula::before { content: 'MATH'; position: absolute; top: 5px; right: 10px; font-size: 0.6rem; color: var(--text-dim); }
+
+        .why-sidebar {
+            border-left: 3px solid var(--tertiary);
+            padding-left: 1.5rem;
+            margin: 2.5rem 0;
+            border-radius: 0 12px 12px 0;
+        }
+
+        .why-sidebar h4 { color: var(--tertiary); font-size: 0.85rem; margin-bottom: 0.5rem; text-transform: uppercase; }
+
+        .lab-footer {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Controls */
+        input[type="range"] { width: 100%; margin: 1rem 0; accent-color: var(--accent); }
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.6rem;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+        .btn:hover { background: #fff; color: #000; transform: translateY(-2px); box-shadow: 0 10px 20px var(--accent-glow); }
+
+        /* Specific Visualizers */
+        #attn-interactive-map { height: 400px; position: relative; background: #000; border-radius: 12px; margin-top: 1.5rem; }
+        .token-tag { padding: 4px 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: 0.2s; font-size: 0.9rem;}
+        .token-tag:hover { background: var(--accent); border-color: var(--accent); }
+
+        #pe-canvas { width: 100%; height: 180px; background: #000; border-radius: 12px; }
+
+        /* Background Effects */
+        #particles-js { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        .glow-orb {
+            position: fixed; width: 40vw; height: 40vw;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            z-index: -1; opacity: 0.3; filter: blur(60px);
+        }
+
+        @media (max-width: 1100px) {
+            .scrolly-container { flex-direction: column; }
+            .side-diagram { position: relative; width: 100%; height: 60vh; }
+            .main-content { width: 100%; }
+            section { padding: 6rem 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="particles-js"></div>
+    <div class="glow-orb" id="orb1" style="top: -10%; left: -10%;"></div>
+    <div class="glow-orb" id="orb2" style="bottom: -10%; right: -10%; background: radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, transparent 70%);"></div>
+
+    <div class="scrolly-container">
+        
+        <!-- SIDE DIAGRAM NAVIGATOR -->
+        <aside class="side-diagram">
+            <svg id="master-diagram" viewBox="0 0 350 630" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrow" markerWidth="8" markerHeight="8" refX="5" refY="4" orient="auto">
+                        <path d="M0,0 L8,4 L0,8 Z" fill="#fff" />
+                    </marker>
+                </defs>
+
+                <!-- ENCODER Nx -->
+                <rect x="25" y="190" width="135" height="280" rx="12" fill="none" stroke="#fff" stroke-dasharray="8,4" opacity="0.4" />
+                <text x="32" y="460" fill="#fff" font-size="11" class="diag-text" opacity="0.6">Nx</text>
+
+                <g id="bl-in-emb" class="diag-grp"><rect class="block" x="40" y="560" width="105" height="35" rx="6" fill="#6366f1" stroke="#fff" /><text x="54" y="582" fill="#fff" font-size="9" class="diag-text">Input Emb.</text></g>
+                <g id="bl-in-pe" class="diag-grp"><circle class="block" cx="40" cy="520" r="16" fill="#a855f7" stroke="#fff" /><text x="65" y="525" fill="#fff" font-size="8" class="diag-text">Pos. Enc.</text></g>
+                
+                <g id="bl-enc-mha" class="diag-grp"><rect class="block" x="40" y="415" width="105" height="35" rx="6" fill="#fbbf24" stroke="#fff" /><text x="44" y="437" fill="#000" font-size="9" class="diag-text">Multi-Head Attn</text></g>
+                <g id="bl-enc-an1" class="diag-grp"><rect class="block" x="35" y="385" width="115" height="18" rx="9" fill="#ec4899" stroke="#fff" /><text x="56" y="398" fill="#fff" font-size="8" class="diag-text">Add & Norm</text></g>
+                <g id="bl-enc-ffn" class="diag-grp"><rect class="block" x="40" y="330" width="105" height="35" rx="6" fill="#3b82f6" stroke="#fff" /><text x="48" y="352" fill="#fff" font-size="9" class="diag-text">Feed Forward</text></g>
+                <g id="bl-enc-an2" class="diag-grp"><rect class="block" x="35" y="300" width="115" height="18" rx="9" fill="#ec4899" stroke="#fff" /><text x="56" y="313" fill="#fff" font-size="8" class="diag-text">Add & Norm</text></g>
+
+                <!-- DECODER Nx -->
+                <rect x="195" y="110" width="140" height="430" rx="12" fill="none" stroke="#fff" stroke-dasharray="8,4" opacity="0.4" />
+                <text x="323" y="530" fill="#fff" font-size="11" class="diag-text" opacity="0.6">Nx</text>
+
+                <g id="bl-out-emb" class="diag-grp"><rect class="block" x="210" y="560" width="110" height="35" rx="6" fill="#6366f1" stroke="#fff" /><text x="220" y="582" fill="#fff" font-size="9" class="diag-text">Output Emb.</text></g>
+                <g id="bl-out-pe" class="diag-grp"><circle class="block" cx="210" cy="520" r="16" fill="#a855f7" stroke="#fff" /><text x="235" y="525" fill="#fff" font-size="8" class="diag-text">Pos. Enc.</text></g>
+
+                <g id="bl-dec-mha-m" class="diag-grp"><rect class="block" x="210" y="450" width="110" height="35" rx="6" fill="#fb923c" stroke="#fff" /><text x="216" y="472" fill="#000" font-size="8" class="diag-text">Masked MH-Attn</text></g>
+                <g id="bl-dec-an1" class="diag-grp"><rect class="block" x="205" y="420" width="120" height="18" rx="9" fill="#ec4899" stroke="#fff" /><text x="230" y="433" fill="#fff" font-size="8" class="diag-text">Add & Norm</text></g>
+
+                <g id="bl-dec-mha-x" class="diag-grp"><rect class="block" x="210" y="360" width="110" height="35" rx="6" fill="#fbbf24" stroke="#fff" /><text x="230" y="382" fill="#000" font-size="9" class="diag-text">MH-Attn</text></g>
+                <g id="bl-dec-an2" class="diag-grp"><rect class="block" x="205" y="330" width="120" height="18" rx="9" fill="#ec4899" stroke="#fff" /><text x="230" y="343" fill="#fff" font-size="8" class="diag-text">Add & Norm</text></g>
+
+                <g id="bl-dec-ffn" class="diag-grp"><rect class="block" x="210" y="270" width="110" height="35" rx="6" fill="#3b82f6" stroke="#fff" /><text x="220" y="292" fill="#fff" font-size="9" class="diag-text">Feed Forward</text></g>
+                <g id="bl-dec-an3" class="diag-grp"><rect class="block" x="205" y="240" width="120" height="18" rx="9" fill="#ec4899" stroke="#fff" /><text x="230" y="253" fill="#fff" font-size="8" class="diag-text">Add & Norm</text></g>
+
+                <!-- FINAL -->
+                <g id="bl-linear" class="diag-grp"><rect class="block" x="210" y="65" width="110" height="28" rx="6" fill="#64748b" stroke="#fff" /><text x="245" y="84" fill="#fff" font-size="9" class="diag-text">Linear</text></g>
+                <g id="bl-softmax" class="diag-grp"><rect class="block" x="190" y="20" width="150" height="28" rx="6" fill="#10b981" stroke="#fff" /><text x="205" y="38" fill="#fff" font-size="9" class="diag-text">Softmax & Prob.</text></g>
+
+                <!-- Flow -->
+                <path d="M160 375 Q 190 375 210 375" stroke="#fff" fill="none" marker-end="url(#arrow)" opacity="0.6"/>
+            </svg>
+        </aside>
+
+        <!-- CONTENT -->
+        <main class="main-content">
+            
+            <section id="hero">
+                <h1 style="font-size: 5rem; margin-bottom: 2rem;">Transformer <br><span style="color: var(--accent)">Interactive Mastery</span></h1>
+                <p style="font-size: 1.5rem; color: var(--text-dim);">Una exploración profunda, técnica y manipulable de la arquitectura que cambió la IA.</p>
+                <div style="margin-top: 4rem;">
+                    <button class="btn" onclick="document.getElementById('sec-in-tok').scrollIntoView({behavior: 'smooth'})">Explorar Arquitectura</button>
+                    <button class="btn" style="background:transparent; border:1px solid var(--border); margin-left: 1rem;" onclick="triggerBackprop()">Entrenar Red (Visual)</button>
+                </div>
+            </section>
+
+            <!-- TOKENIZATION (NEW) -->
+            <section id="sec-in-tok">
+                <span class="tech-badge">Preprocessing</span>
+                <h2>0. Tokenización & IDs</h2>
+                <div class="glass-card">
+                    <p>Antes de los vectores, el texto se rompe en piezas (tokens). Cada token recibe un ID único.</p>
+                    <div class="lab">
+                        <input type="text" id="tok-input" value="La inteligencia artificial es magia" style="background:rgba(0,0,0,0.5); border:1px solid var(--border); padding:1rem; color:white; width:100%; border-radius:8px; margin-bottom:1.5rem;">
+                        <div id="tok-viz" style="display: flex; flex-wrap: wrap; gap: 10px;"></div>
+                        <div id="id-viz" style="margin-top: 1rem; font-family: var(--font-mono); color: var(--accent); font-size: 0.9rem;"></div>
+                    </div>
+                    <div class="why-sidebar">
+                        <h4>¿Por qué no por letras?</h4>
+                        <p>Las letras individuales no tienen significado. Las palabras enteras son demasiadas. Los sub-tokens (BPE) son el equilibrio perfecto: manejan palabras nuevas y mantienen el contexto semántico.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 1. INPUT EMBEDDING -->
+            <section id="sec-in-emb">
+                <span class="tech-badge">Vector Space</span>
+                <h2>1. Input Embedding</h2>
+                <div class="glass-card">
+                    <p>Convertimos los IDs en vectores de <span class="math">d_model = 512</span>.</p>
+                    <div class="lab">
+                        <div id="emb-interactive-grid" style="display: grid; grid-template-columns: repeat(16, 1fr); gap: 4px;"></div>
+                        <p style="text-align: center; margin-top: 1rem; font-size: 0.8rem; color: var(--text-dim);">Haz click para "entrenar" un vector aleatorio.</p>
+                    </div>
+                    <div class="why-sidebar">
+                        <h4>The Geometry of Language</h4>
+                        <p>A través del entrenamiento, palabras similares se atraen. "Perro" y "Gato" se acercan en este hiper-espacio, "Rey" - "Hombre" + "Mujer" ≈ "Reina".</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. POSITIONAL ENCODING -->
+            <section id="sec-in-pe">
+                <span class="tech-badge">Attention Order</span>
+                <h2>2. Positional Encoding</h2>
+                <div class="glass-card">
+                    <p>Como el Transformer es paralelo, inyectamos el orden usando ondas de Sin/Cos.</p>
+                    <div class="lab">
+                        <div style="display: flex; gap: 2rem; margin-bottom: 2rem;">
+                            <div style="flex: 1;">
+                                <label class="diag-text" style="font-size: 0.7rem;">Dimensión (i)</label>
+                                <input type="range" id="pe-dim" min="0" max="511" value="0">
+                            </div>
+                            <div style="flex: 1;">
+                                <label class="diag-text" style="font-size: 0.7rem;">Posición (pos)</label>
+                                <input type="range" id="pe-pos" min="0" max="100" value="0">
+                            </div>
+                        </div>
+                        <canvas id="pe-canvas"></canvas>
+                        <div id="pe-formula-live" class="formula">PE(0, 0) = 0.00</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. MULTI-HEAD ATTENTION -->
+            <section id="sec-enc-mha">
+                <span class="tech-badge">Attention Lab</span>
+                <h2>3. Self-Attention Interactiva</h2>
+                <div class="glass-card">
+                    <p>Cálculo de pesos: cada palabra decide cuánta importancia dar a las demás.</p>
+                    <div id="attn-interactive-map">
+                        <canvas id="attn-canvas" style="position: absolute; width: 100%; height: 100%; pointer-events: none;"></canvas>
+                        <div id="attn-tokens-top" style="display: flex; gap: 1rem; position: absolute; top: 20px; left: 50%; transform: translateX(-50%);"></div>
+                        <div id="attn-tokens-bottom" style="display: flex; gap: 1rem; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);"></div>
+                    </div>
+                    <div class="why-sidebar">
+                        <h4>The Scaling Factor (1/&radic;d<sub>k</sub>)</h4>
+                        <p>Sin esto, los productos escalares crecen tanto que el gradiente del Softmax se vuelve casi cero (Vanishing Gradient), impidiendo que el modelo aprenda de sus errores.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. ADD & NORM -->
+            <section id="sec-enc-an1">
+                <span class="tech-badge">Training Stability</span>
+                <h2>4. Add & Norm</h2>
+                <div class="glass-card">
+                    <p>Residuals (Add) + Layer Normalization. El seguro de vida del entrenamiento.</p>
+                    <div class="lab">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; margin: 2rem 0;">
+                            <div id="res-highway" style="width: 150px; height: 10px; background: var(--tertiary); border-radius: 5px; position: relative;">
+                                <div class="signal" style="position: absolute; width: 8px; height: 8px; background: white; border-radius: 50%; top: 1px;"></div>
+                            </div>
+                            <button class="btn" style="background:var(--tertiary)" onclick="toggleNoise()">Añadir Ruido</button>
+                        </div>
+                        <p id="an-status" style="text-align: center; font-size: 0.9rem; color: var(--tertiary);">Señal Limpia (Residual activo)</p>
+                    </div>
+                    <div class="why-sidebar">
+                        <h4>Vanishing Gradient</h4>
+                        <p>A medida que la red se hace profunda, el "mensaje" del error se pierde. Los Residuals son **autopistas** que llevan el gradiente directamente a las capas fundamentales sin obstáculos.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. FEED FORWARD (FFN) INTERACTIVE -->
+            <section id="sec-enc-ffn">
+                <span class="tech-badge">Deep Processing</span>
+                <h2>5. Position-wise Feed Forward</h2>
+                <div class="glass-card">
+                    <p>Refinando información. <span class="math">512 &rarr; 2048 &rarr; 512</span>.</p>
+                    <div class="lab">
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <label>Valor de Entrada (x):</label>
+                            <input type="range" id="ffn-input" min="-10" max="10" value="2">
+                            <div class="formula" style="font-size: 0.8rem;">
+                                x: <span id="ff-val-in">2.0</span> &rarr; Linear1: <span id="ff-val-l1">8.0</span> &rarr; ReLU: <span id="ff-val-relu">8.0</span> &rarr; Linear2: <span id="ff-val-out">4.0</span>
+                            </div>
+                            <div style="height: 60px; background: #000; display: flex; align-items: center; gap: 20px; padding: 0 1rem; border-radius: 8px;">
+                                <div id="ff-ball" style="width: 20px; height: 20px; background: var(--secondary); border-radius: 50%;"></div>
+                                <div style="flex: 1; height: 2px; background: var(--border); position: relative;">
+                                    <div style="position: absolute; left: 50%; width: 2px; height: 10px; background: var(--accent); top: -4px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. MASKED ATTENTION -->
+            <section id="sec-dec-mha-m">
+                <span class="tech-badge">Generative Constraint</span>
+                <h2>6. Masked Multi-Head Attention</h2>
+                <div class="glass-card">
+                    <p>El Decoder no puede ver el futuro. Protegemos la causalidad.</p>
+                    <div class="lab">
+                        <div id="causal-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 200px; margin: 0 auto;"></div>
+                        <div style="margin-top: 1rem; text-align: center;">
+                            <span style="color:var(--danger)">■</span> Futuro Enmascarado | <span style="color:var(--tertiary)">■</span> Pasado Visible
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 7. DECODING STRATEGY (NEW) -->
+            <section id="sec-softmax">
+                <span class="tech-badge">Final Step</span>
+                <h2>7. Decoding Strategy</h2>
+                <div class="glass-card">
+                    <p>De probabilidades a texto. ¿Cómo elige el modelo la siguiente palabra?</p>
+                    <div class="lab">
+                        <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                            <button class="btn" style="flex:1" onclick="setDecoding('greedy')">Greedy (Más probable)</button>
+                            <button class="btn" style="flex:1; background:var(--secondary)" onclick="setDecoding('beam')">Beam Search (Exploración)</button>
+                        </div>
+                        <div id="decoding-viz" style="height: 200px; background: #000; border-radius: 12px; position: relative; padding: 1rem;">
+                            <!-- Tree visual placeholder -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        // --- GLOBAL STATE ---
+        let currentText = "La inteligencia artificial es magia";
+        let tokens = [];
+
+        // DOM elements needed by functions
+        const tokInput = document.getElementById('tok-input');
+        const tokViz = document.getElementById('tok-viz');
+        const idViz = document.getElementById('id-viz');
+        const attnContainerTop = document.getElementById('attn-tokens-top');
+        const attnContainerBottom = document.getElementById('attn-tokens-bottom');
+        const attnCanvas = document.getElementById('attn-canvas');
+        const aCtx = attnCanvas.getContext('2d');
+        const peCanvas = document.getElementById('pe-canvas');
+        const peCtx = peCanvas.getContext('2d');
+        const peDimRef = document.getElementById('pe-dim');
+        const pePosRef = document.getElementById('pe-pos');
+        const peFormula = document.getElementById('pe-formula-live');
+        const ffInput = document.getElementById('ffn-input');
+
+        // --- BACKGROUND & ORBES ---
+        window.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            gsap.to('#orb1', { x: x * 150, y: y * 150, duration: 2 });
+            gsap.to('#orb2', { x: -x * 120, y: -y * 120, duration: 2 });
+        });
+
+        // --- SCROLL SYNC ---
+        const sections = document.querySelectorAll('section');
+        const diagBlocks = document.querySelectorAll('.diag-grp');
+
+        sections.forEach(sec => {
+            const blockId = sec.id.replace('sec-', 'bl-');
+            ScrollTrigger.create({
+                trigger: sec,
+                start: "top 50%", end: "bottom 50%",
+                onToggle: self => {
+                    if(self.isActive) updateDiagram(blockId);
+                }
+            });
+        });
+
+        function updateDiagram(id) {
+            diagBlocks.forEach(b => {
+                const rect = b.querySelector('.block');
+                if(b.id === id) {
+                    rect.classList.add('active-block');
+                    rect.classList.remove('dimmed');
+                } else {
+                    rect.classList.remove('active-block');
+                    rect.classList.add('dimmed');
+                }
+            });
+        }
+
+        // --- LAB 0: TOKENIZATION ---
+        function updateTokens() {
+            if (!tokInput) return;
+            const text = tokInput.value;
+            const list = text.split(' ').filter(t => t.length > 0);
+            tokViz.innerHTML = '';
+            idViz.innerText = 'IDs: [';
+            list.forEach((t, i) => {
+                const span = document.createElement('span');
+                span.className = 'token-tag';
+                span.innerText = t;
+                tokViz.appendChild(span);
+                const id = t.length * 124 + i; // Simulated hash
+                idViz.innerText += (i === 0 ? '' : ', ') + id;
+            });
+            idViz.innerText += ']';
+            updateAttentionMap(list);
+        }
+        if (tokInput) tokInput.addEventListener('input', updateTokens);
+
+        // --- LAB 2: PE CANVAS ---
+        function drawPE() {
+            if (!peCanvas) return;
+            const W = peCanvas.width = peCanvas.offsetWidth;
+            const H = peCanvas.height = peCanvas.offsetHeight;
+            peCtx.clearRect(0,0,W,H);
+            
+            const i = parseInt(peDimRef.value);
+            const pos = parseInt(pePosRef.value);
+            
+            // Draw all waves faintly
+            for(let d=0; d<10; d++) {
+                peCtx.beginPath();
+                peCtx.strokeStyle = `rgba(168, 85, 247, ${0.1/(d+1)})`;
+                peCtx.lineWidth = 1;
+                for(let x=0; x<W; x++) {
+                    const y = H/2 + Math.sin(x/((d+1)*5) + Date.now()*0.001) * 30;
+                    if(x===0) peCtx.moveTo(x,y); else peCtx.lineTo(x,y);
+                }
+                peCtx.stroke();
+            }
+
+            // Draw current selection
+            const val = Math.sin(pos / Math.pow(10000, i/512));
+            peFormula.innerHTML = `PE(<span style="color:var(--secondary)">pos=${pos}</span>, <span style="color:var(--accent)">2i=${i}</span>) = <span style="color:white">${val.toFixed(4)}</span>`;
+            
+            requestAnimationFrame(drawPE);
+        }
+
+        // --- LAB 3: INTERACTIVE ATTENTION ---
+        function updateAttentionMap(wordList) {
+            if (!attnContainerTop) return;
+            attnContainerTop.innerHTML = '';
+            attnContainerBottom.innerHTML = '';
+            wordList.forEach((word, idx) => {
+                const t1 = document.createElement('div');
+                t1.className = 'token-tag';
+                t1.innerText = word;
+                t1.onmouseover = () => drawAttnLines(idx, wordList);
+                t1.onmouseout = () => aCtx.clearRect(0,0,attnCanvas.width, attnCanvas.height);
+                attnContainerTop.appendChild(t1);
+
+                const t2 = t1.cloneNode(true);
+                attnContainerBottom.appendChild(t2);
+            });
+        }
+
+        function drawAttnLines(sourceIdx, list) {
+            const W = attnCanvas.width = attnCanvas.offsetWidth;
+            const H = attnCanvas.height = attnCanvas.offsetHeight;
+            aCtx.clearRect(0,0,W,H);
+            
+            const topTokens = attnContainerTop.querySelectorAll('.token-tag');
+            const bottomTokens = attnContainerBottom.querySelectorAll('.token-tag');
+            
+            if (!topTokens[sourceIdx]) return;
+            const sourceRect = topTokens[sourceIdx].getBoundingClientRect();
+            const containerRect = document.getElementById('attn-interactive-map').getBoundingClientRect();
+            
+            const x1 = (sourceRect.left + sourceRect.width/2) - containerRect.left;
+            const y1 = sourceRect.bottom - containerRect.top;
+
+            bottomTokens.forEach((target, i) => {
+                const targetRect = target.getBoundingClientRect();
+                const x2 = (targetRect.left + targetRect.width/2) - containerRect.left;
+                const y2 = targetRect.top - containerRect.top;
+                
+                const score = i === sourceIdx ? 0.8 : Math.random() * 0.4;
+                aCtx.strokeStyle = `rgba(168, 85, 247, ${score})`;
+                aCtx.lineWidth = score * 5;
+                aCtx.beginPath();
+                aCtx.moveTo(x1, y1);
+                aCtx.lineTo(x2, y2);
+                aCtx.stroke();
+            });
+        }
+
+        // --- LAB 4: ADD & NORM ---
+        let isNoiseOn = false;
+        function toggleNoise() {
+            isNoiseOn = !isNoiseOn;
+            const status = document.getElementById('an-status');
+            const pulse = document.querySelector('.signal');
+            if (isNoiseOn) {
+                status.innerText = "Error detectado: Ruido en la señal";
+                status.style.color = "var(--danger)";
+                gsap.to(pulse, { x: "+=2", yoyo: true, repeat: -1, duration: 0.05 });
+            } else {
+                status.innerText = "Señal Limpia (Residual activo)";
+                status.style.color = "var(--tertiary)";
+                gsap.killTweensOf(pulse);
+                gsap.set(pulse, { x: 0 });
+            }
+        }
+        function animateSignal() {
+            gsap.fromTo('.signal', { left: "0%" }, { left: "100%", duration: 2, repeat: -1, ease: "none" });
+        }
+
+        // --- LAB 5: FFN WIDGET ---
+        function updateFFN() {
+            const x = parseFloat(ffInput.value);
+            const w1 = 4;
+            const l1 = x * w1;
+            const relu = Math.max(0, l1);
+            const w2 = 0.5;
+            const out = relu * w2;
+            
+            document.getElementById('ff-val-in').innerText = x.toFixed(1);
+            document.getElementById('ff-val-l1').innerText = l1.toFixed(1);
+            document.getElementById('ff-val-relu').innerText = relu.toFixed(1);
+            document.getElementById('ff-val-out').innerText = out.toFixed(1);
+            
+            gsap.to('#ff-ball', { x: (out + 5) * 15, duration: 0.2 });
+        }
+        if (ffInput) ffInput.addEventListener('input', updateFFN);
+
+        // --- LAB 7: DECODING ---
+        function setDecoding(type) {
+            const viz = document.getElementById('decoding-viz');
+            viz.innerHTML = '';
+            if (type === 'greedy') {
+                viz.innerHTML = `<div style="color:var(--tertiary)">Greedy: Siguiente(P) = argmax(Prob) = "Gato"</div>
+                                 <div style="margin-top:10px; font-size:0.8rem; color:var(--text-dim)">Rápido pero puede ser subóptimo a largo plazo.</div>`;
+            } else {
+                viz.innerHTML = `<div style="color:var(--secondary)">Beam Search (k=3): [Gato, Perro, El]</div>
+                                 <div style="margin-top:10px; font-size:0.8rem; color:var(--text-dim)">Explora múltiples caminos para encontrar la frase más probable globalmente.</div>`;
+            }
+            gsap.from(viz.childNodes, { opacity: 0, y: 10, stagger: 0.1 });
+        }
+
+        // --- LAB 1: EMBEDDING INTERACTIVE ---
+        function setupEmbeddingGrid() {
+            const grid = document.getElementById('emb-interactive-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            for(let i=0; i<64; i++) {
+                const cell = document.createElement('div');
+                cell.style.aspectRatio = '1';
+                cell.style.background = `rgba(99, 102, 241, ${0.1 + Math.random() * 0.5})`;
+                cell.style.borderRadius = '2px';
+                cell.style.cursor = 'crosshair';
+                cell.style.border = '1px solid rgba(255,255,255,0.05)';
+                cell.onclick = () => trainVector(cell);
+                grid.appendChild(cell);
+            }
+        }
+
+        function trainVector(el) {
+            const tl = gsap.timeline();
+            tl.to(el, { background: "#fff", scale: 1.2, duration: 0.1 })
+              .to(el, { x: "random(-2, 2)", y: "random(-2, 2)", repeat: 5, duration: 0.05, yoyo: true })
+              .to(el, { background: "var(--tertiary)", scale: 1, duration: 0.3 })
+              .to(el, { filter: "drop-shadow(0 0 5px var(--tertiary))", duration: 0.2 });
+            
+            const label = document.createElement('div');
+            label.innerText = 'ΔW update';
+            label.style.position = 'absolute';
+            label.style.fontSize = '8px';
+            label.style.color = 'var(--tertiary)';
+            label.style.pointerEvents = 'none';
+            label.style.left = el.offsetLeft + 'px';
+            label.style.top = el.offsetTop - 10 + 'px';
+            el.parentElement.appendChild(label);
+            gsap.to(label, { y: -20, opacity: 0, duration: 1, onComplete: () => label.remove() });
+        }
+
+        // --- BACKPROP ACTION (HYPER DETAILED) ---
+        function triggerBackprop() {
+            const hud = document.createElement('div');
+            hud.style.cssText = 'position:fixed; top:20px; right:20px; background:var(--glass); border:1px solid var(--accent); padding:1rem; border-radius:10px; z-index:100; font-family:var(--font-mono); font-size:0.8rem; pointer-events:none; min-width:250px;';
+            hud.innerHTML = '<div style="color:var(--danger)">[SYSTEM] Iniciando Optimización...</div>';
+            document.body.appendChild(hud);
+
+            const timeline = gsap.timeline({ onComplete: () => {
+                setTimeout(() => gsap.to(hud, { opacity: 0, onComplete: () => hud.remove() }), 2000);
+            }});
+
+            timeline.call(() => {
+                hud.innerHTML += '<div>> Calculando Cross-Entropy Loss...</div>';
+                const softBlock = document.querySelector('#bl-softmax .block');
+                gsap.to(softBlock, { fill: "var(--danger)", scale: 1.1, duration: 0.2, repeat: 3, yoyo: true });
+            });
+
+            const reversedBlocks = [...diagBlocks].reverse();
+            reversedBlocks.forEach((b, i) => {
+                timeline.to(b, {
+                    filter: "brightness(4) saturate(2)",
+                    duration: 0.2,
+                    onStart: () => {
+                        const name = b.querySelector('text').textContent;
+                        hud.innerHTML = `<div style="color:var(--accent)">> Derivando ${name}...</div><div style="font-size:0.6rem; color:var(--text-dim)">Propagando gradiente ∂L/∂W...</div>`;
+                        const p = document.createElement('div');
+                        p.style.cssText = `position:fixed; width:6px; height:6px; background:white; border-radius:50%; z-index:99; box-shadow:0 0 10px white;`;
+                        const rect = b.getBoundingClientRect();
+                        p.style.left = rect.left + rect.width/2 + 'px';
+                        p.style.top = rect.top + rect.height/2 + 'px';
+                        document.body.appendChild(p);
+                        gsap.to(p, { x: -200, opacity: 0, duration: 0.6, onComplete: () => p.remove() });
+                    },
+                    onComplete: () => gsap.set(b, { clearProps: "filter" })
+                }, ">-0.1");
+            });
+
+            timeline.call(() => {
+                hud.innerHTML = '<div style="color:var(--tertiary)">[SUCCESS] Pesos actualizados.</div><div style="font-size:0.7rem">Loss decinado: 0.85 → 0.42</div>';
+                const embGridCells = document.querySelectorAll('#emb-interactive-grid div');
+                gsap.to(embGridCells, { 
+                    background: "var(--tertiary)", 
+                    stagger: { amount: 0.5, grid: [4, 16], from: "center" },
+                    duration: 0.3,
+                    yoyo: true, repeat: 1
+                });
+            });
+
+            timeline.fromTo('body', { backgroundColor: "#1e0b36" }, { backgroundColor: "#020205", duration: 1.5 });
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            setupEmbeddingGrid();
+            updateTokens();
+            drawPE();
+            updateFFN();
+            animateSignal();
+            setDecoding('greedy');
+            
+            const causalGrid = document.getElementById('causal-grid');
+            if (causalGrid) {
+                causalGrid.innerHTML = '';
+                for(let i=0; i<25; i++) {
+                    const r = Math.floor(i/5);
+                    const c = i%5;
+                    const div = document.createElement('div');
+                    div.style.aspectRatio = '1';
+                    div.style.borderRadius = '3px';
+                    div.style.background = c > r ? 'var(--danger)' : 'var(--tertiary)';
+                    div.style.opacity = c > r ? 0.2 : 1;
+                    causalGrid.appendChild(div);
+                }
+            }
+        };
+
+    </script>
+</body>
+</html>
